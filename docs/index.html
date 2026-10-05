@@ -1,0 +1,257 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Clipper — Instant replay clips for Mac</title>
+<meta name="description" content="Clipper runs in your menu bar and keeps the last 30 seconds of your screen, game audio and mic. Press a hotkey and the moment is saved. Share it as a link.">
+<link rel="icon" type="image/png" href="favicon.png">
+<link rel="canonical" href="https://macclipping.com/">
+<meta property="og:title" content="Clipper — Instant replay clips for Mac">
+<meta property="og:description" content="Save the last 30 seconds of your screen, game audio and mic with one hotkey. Share it as a link.">
+<meta property="og:image" content="https://macclipping.com/icon.png">
+<meta property="og:url" content="https://macclipping.com/">
+<meta name="theme-color" content="#0d0a1c">
+<style>
+  :root {
+    --bg: #0d0a1c; --bg2: #14102a; --card: #17122f; --line: rgba(255,255,255,.09);
+    --text: #f3f1fb; --muted: #a9a4c4; --accent: #8b5cf6; --accent2: #c084fc; --rec: #ff4559;
+  }
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  html, body { overflow-x: hidden; }
+  body {
+    margin: 0; background: var(--bg); color: var(--text);
+    font: 16px/1.6 -apple-system, BlinkMacSystemFont, "SF Pro Text", "Inter", system-ui, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  a { color: inherit; }
+  .wrap { max-width: 1080px; margin: 0 auto; padding: 0 24px; }
+  .glow {
+    position: absolute; inset: 0 0 auto 0; height: 760px; z-index: -1; overflow: hidden;
+    background:
+      radial-gradient(600px 380px at 20% 0%, rgba(139,92,246,.40), transparent 70%),
+      radial-gradient(560px 360px at 85% 10%, rgba(255,69,89,.18), transparent 70%);
+  }
+  header.nav { display: flex; align-items: center; justify-content: space-between; padding-block: 22px; }
+  .brand { display: flex; align-items: center; gap: 10px; font-weight: 700; font-size: 19px; letter-spacing: -.01em; text-decoration: none; }
+  .brand img { width: 30px; height: 30px; border-radius: 8px; }
+  .nav a.link { color: var(--muted); text-decoration: none; margin-left: 22px; font-size: 15px; }
+  .nav a.link:hover { color: var(--text); }
+  .btn {
+    display: inline-flex; align-items: center; gap: 10px; padding: 14px 24px; border-radius: 12px; font-weight: 600;
+    text-decoration: none; background: linear-gradient(180deg, #9b6dff, #7c47ec); color: #fff;
+    box-shadow: 0 8px 30px rgba(124,71,236,.45), inset 0 1px 0 rgba(255,255,255,.25);
+    transition: transform .15s, box-shadow .15s;
+  }
+  .btn:hover { transform: translateY(-1px); box-shadow: 0 12px 36px rgba(124,71,236,.55), inset 0 1px 0 rgba(255,255,255,.25); }
+  .btn.small { padding: 9px 16px; font-size: 14px; border-radius: 10px; }
+  .btn svg { width: 20px; height: 20px; }
+
+  .hero { text-align: center; padding: 56px 0 24px; }
+  .pill {
+    display: inline-flex; align-items: center; gap: 8px; padding: 6px 14px; border: 1px solid var(--line);
+    border-radius: 999px; font-size: 13px; color: var(--muted); background: rgba(255,255,255,.03);
+  }
+  .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--rec); box-shadow: 0 0 0 0 rgba(255,69,89,.7); animation: pulse 1.8s infinite; }
+  @keyframes pulse { 70% { box-shadow: 0 0 0 9px rgba(255,69,89,0); } 100% { box-shadow: 0 0 0 0 rgba(255,69,89,0); } }
+  h1 { font-size: clamp(38px, 7vw, 68px); line-height: 1.05; letter-spacing: -.035em; margin: 22px 0 18px; font-weight: 800; }
+  h1 span { background: linear-gradient(90deg, #b794ff, #ff7a8a); -webkit-background-clip: text; background-clip: text; color: transparent; }
+  .sub { max-width: 640px; margin: 0 auto 30px; color: var(--muted); font-size: clamp(16px, 2.2vw, 19px); }
+  .cta { display: flex; flex-direction: column; align-items: center; gap: 12px; }
+  .meta { color: var(--muted); font-size: 13.5px; }
+  .meta a { color: var(--accent2); }
+
+  /* app mock-up */
+  .shot { margin: 54px auto 0; max-width: 880px; }
+  .win {
+    border: 1px solid var(--line); border-radius: 14px; overflow: hidden; background: #1b1635;
+    box-shadow: 0 40px 90px rgba(0,0,0,.55), 0 0 0 1px rgba(255,255,255,.03);
+  }
+  .bar { display: flex; gap: 7px; padding: 12px 14px; background: #221c40; }
+  .bar i { width: 12px; height: 12px; border-radius: 50%; background: #ff5f57; }
+  .bar i:nth-child(2) { background: #febc2e; } .bar i:nth-child(3) { background: #28c840; }
+  .body { display: grid; grid-template-columns: 170px 1fr; min-height: 330px; text-align: left; }
+  .side { background: rgba(255,255,255,.03); border-right: 1px solid var(--line); padding: 14px 10px; font-size: 14px; display: flex; flex-direction: column; gap: 4px; }
+  .side div { padding: 7px 10px; border-radius: 7px; color: var(--muted); }
+  .side .on { background: rgba(139,92,246,.28); color: var(--text); }
+  .side .status { margin-top: auto; font-size: 12px; display: flex; align-items: center; gap: 7px; padding: 8px 6px; }
+  .main { padding: 16px; min-width: 0; }
+  .toprow { flex-wrap: wrap; display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; font-size: 13px; color: var(--muted); gap: 12px; }
+  .slider { height: 5px; width: 190px; border-radius: 4px; background: rgba(255,255,255,.12); position: relative; margin-top: 7px; }
+  .slider::after { content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 38%; background: var(--accent); border-radius: 4px; }
+  .savebtn { background: var(--accent); color: #fff; border-radius: 8px; padding: 7px 12px; font-size: 13px; font-weight: 600; white-space: nowrap; }
+  .clip { display: flex; gap: 12px; align-items: center; padding: 10px 0; border-top: 1px solid var(--line); }
+  .thumb { width: 112px; height: 63px; border-radius: 7px; flex: none; position: relative; }
+  .thumb b { position: absolute; right: 4px; bottom: 4px; font-size: 10px; font-weight: 500; background: rgba(0,0,0,.65); padding: 0 4px; border-radius: 3px; }
+  .t1 { background: linear-gradient(135deg, #3b2a7a, #e0557a); } .t2 { background: linear-gradient(135deg, #0f3d5e, #36b6a1); } .t3 { background: linear-gradient(135deg, #5a2a52, #f0a35c); }
+  .clip .info { flex: 1; min-width: 0; font-size: 13px; }
+  .clip .info strong { display: block; font-size: 14px; }
+  .clip .info small { color: var(--muted); }
+  .chip { font-size: 12px; border: 1px solid var(--line); padding: 4px 9px; border-radius: 7px; color: var(--muted); white-space: nowrap; }
+  .banner {
+    position: absolute; right: -18px; top: -34px; width: 270px; z-index: 2; display: flex; gap: 10px; align-items: center; padding: 11px 14px;
+    background: rgba(32,26,62,.92); backdrop-filter: blur(14px); border: 1px solid rgba(255,255,255,.14);
+    border-radius: 14px; box-shadow: 0 18px 50px rgba(0,0,0,.5); font-size: 13px; text-align: left;
+  }
+  .banner .ok { width: 26px; height: 26px; border-radius: 50%; background: #34d399; color: #062; display: grid; place-items: center; font-weight: 800; flex: none; }
+  .banner small { color: var(--muted); display: block; }
+  .shotwrap { position: relative; }
+
+  section { padding: 84px 0 0; }
+  h2 { font-size: clamp(28px, 4.4vw, 40px); letter-spacing: -.025em; line-height: 1.12; margin: 0 0 12px; text-align: center; }
+  .lead { text-align: center; color: var(--muted); max-width: 600px; margin: 0 auto 44px; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 16px; }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 16px; padding: 22px; }
+  .card .ic { width: 40px; height: 40px; border-radius: 11px; display: grid; place-items: center; font-size: 20px;
+    background: linear-gradient(135deg, rgba(139,92,246,.35), rgba(255,69,89,.22)); margin-bottom: 14px; }
+  .card h3 { margin: 0 0 6px; font-size: 17px; letter-spacing: -.01em; }
+  .card p { margin: 0; color: var(--muted); font-size: 15px; }
+  .steps { counter-reset: s; display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 16px; }
+  .step { position: relative; padding: 22px 22px 22px 22px; border-left: 2px solid var(--accent); background: linear-gradient(90deg, rgba(139,92,246,.10), transparent); border-radius: 0 14px 14px 0; }
+  .step::before { counter-increment: s; content: counter(s); font-weight: 800; font-size: 28px; color: var(--accent2); display: block; line-height: 1; margin-bottom: 8px; }
+  .step h3 { margin: 0 0 4px; font-size: 17px; } .step p { margin: 0; color: var(--muted); font-size: 15px; }
+  kbd { font: 600 13px ui-monospace, SFMono-Regular, Menlo, monospace; background: rgba(255,255,255,.1); border: 1px solid var(--line); border-bottom-width: 2px; padding: 1px 7px; border-radius: 6px; }
+
+  .faq { max-width: 760px; margin: 0 auto; }
+  details { border-bottom: 1px solid var(--line); padding: 16px 4px; }
+  summary { cursor: pointer; font-weight: 600; font-size: 17px; list-style: none; display: flex; justify-content: space-between; gap: 16px; }
+  summary::after { content: "+"; color: var(--accent2); font-size: 22px; line-height: 1; }
+  details[open] summary::after { content: "–"; }
+  details p, details ol { color: var(--muted); margin: 10px 0 0; }
+  details code { background: rgba(255,255,255,.08); padding: 2px 6px; border-radius: 5px; font-size: 13.5px; word-break: break-all; }
+
+  .final { text-align: center; margin: 90px 0 0; padding: 56px 24px; border: 1px solid var(--line); border-radius: 22px;
+    background: radial-gradient(500px 240px at 50% 0%, rgba(139,92,246,.30), transparent 70%), var(--bg2); }
+  .final h2 { margin-bottom: 20px; }
+  footer { padding: 54px 0 46px; text-align: center; color: var(--muted); font-size: 14px; }
+  footer a { color: var(--muted); }
+
+  @media (max-width: 720px) {
+    .body { grid-template-columns: minmax(0, 1fr); } .side { display: none; }
+    .banner { right: 8px; top: -30px; width: 250px; }
+    .chip { display: none; }
+    .slider { width: 140px; }
+    .nav a.link { display: none; }
+  }
+</style>
+</head>
+<body>
+<div class="glow"></div>
+
+<div class="wrap">
+  <header class="nav">
+    <a class="brand" href="#"><img src="icon.png" alt="">Clipper</a>
+    <nav><a class="link" href="#features">Features</a><a class="link" href="#how">How it works</a><a class="link" href="#faq">FAQ</a>
+      <a class="btn small js-download" href="https://github.com/Rymack15/clipper/releases/latest/download/Clipper.dmg" style="margin-left:22px">Download</a></nav>
+  </header>
+
+  <main>
+    <div class="hero">
+      <span class="pill"><span class="dot"></span> Always recording the last 30 seconds</span>
+      <h1>Never miss <span>the moment.</span></h1>
+      <p class="sub">Clipper lives in your menu bar and keeps your screen, game audio and mic in a rolling buffer. Press one hotkey and the last stretch is saved as a video. Share it as a link.</p>
+      <div class="cta">
+        <a class="btn js-download" href="https://github.com/Rymack15/clipper/releases/latest/download/Clipper.dmg">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12m0 0l-5-5m5 5l5-5M4 20h16"/></svg>
+          Download for Mac
+        </a>
+        <span class="meta"><span id="ver">Latest version</span> · macOS 15 or newer · Apple silicon &amp; Intel</span>
+      </div>
+
+      <div class="shot"><div class="shotwrap">
+        <div class="win">
+          <div class="bar"><i></i><i></i><i></i></div>
+          <div class="body">
+            <div class="side"><div class="on">Clips</div><div>Settings</div><div>Updates</div>
+              <div class="status"><span class="dot"></span>Recording — last 30 seconds</div></div>
+            <div class="main">
+              <div class="toprow">
+                <div>Clip length: <strong style="color:var(--text)">30 seconds</strong><div class="slider"></div></div>
+                <span class="savebtn">Save Clip &nbsp;⇧⌘P</span>
+              </div>
+              <div class="clip"><div class="thumb t1"><b>0:30</b></div>
+                <div class="info"><strong>Today at 9:41 PM</strong><small>38.2 MB</small></div><span class="chip">Copy Link</span></div>
+              <div class="clip"><div class="thumb t2"><b>0:30</b></div>
+                <div class="info"><strong>Today at 9:12 PM</strong><small>41.7 MB</small></div><span class="chip">Share Link</span></div>
+              <div class="clip"><div class="thumb t3"><b>0:30</b></div>
+                <div class="info"><strong>Yesterday at 11:03 PM</strong><small>35.9 MB</small></div><span class="chip">Share Link</span></div>
+            </div>
+          </div>
+        </div>
+        <div class="banner"><div class="ok">✓</div><div><strong>Clip saved</strong><small>Last 30 seconds</small></div></div>
+      </div></div>
+    </div>
+
+    <section id="features">
+      <h2>Everything for the highlight reel</h2>
+      <p class="lead">Small, quick and out of your way. No account, no sign-in.</p>
+      <div class="grid">
+        <div class="card"><div class="ic">⏺</div><h3>Always on</h3><p>Records quietly in the menu bar, so the clip is already there when something amazing happens.</p></div>
+        <div class="card"><div class="ic">⌨️</div><h3>Your hotkey</h3><p>Pick any shortcut. It works while a game is in full screen.</p></div>
+        <div class="card"><div class="ic">🎧</div><h3>Screen, game audio &amp; mic</h3><p>Captures your display with game and system sound plus your microphone, mixed into one track.</p></div>
+        <div class="card"><div class="ic">⏱</div><h3>Any length</h3><p>Slide from 5 seconds to 5 minutes. Choose 720p, 1080p or 1440p and 30 or 60 fps.</p></div>
+        <div class="card"><div class="ic">🔗</div><h3>Share as a link</h3><p>Upload a lighter copy and get a link for chats and forums that don't allow big files.</p></div>
+        <div class="card"><div class="ic">🔒</div><h3>Private by default</h3><p>Everything stays on your Mac until you choose to share a clip. No analytics.</p></div>
+      </div>
+    </section>
+
+    <section id="how">
+      <h2>Three steps</h2>
+      <p class="lead">From install to first clip in under a minute.</p>
+      <div class="steps">
+        <div class="step"><h3>Install &amp; allow</h3><p>Drag Clipper to Applications, open it and allow Screen Recording and Microphone.</p></div>
+        <div class="step"><h3>Play</h3><p>Clipper keeps the last 30 seconds (or whatever you choose) rolling in memory.</p></div>
+        <div class="step"><h3>Press <kbd>⇧⌘P</kbd></h3><p>You get a pop-up and the clip is saved to your Movies folder, ready to share.</p></div>
+      </div>
+    </section>
+
+    <section id="faq">
+      <h2>Questions</h2>
+      <p class="lead">&nbsp;</p>
+      <div class="faq">
+        <details><summary>macOS says Clipper "can't be opened" or "is damaged"</summary>
+          <p>Clipper is a new indie app and isn't notarized by Apple yet, so Gatekeeper warns on the first launch. To open it:</p>
+          <ol><li>Drag Clipper to Applications.</li><li>Right-click it, choose <strong>Open</strong>, then <strong>Open</strong> again.</li></ol>
+          <p>If that doesn't work, run this once in Terminal: <code>xattr -dr com.apple.quarantine /Applications/Clipper.app</code></p></details>
+        <details><summary>Why does it need Screen Recording and Microphone?</summary>
+          <p>Screen Recording lets macOS give Clipper your display and system audio. Microphone adds your voice. Clipper only holds the most recent clip length in memory and writes a file only when you press the hotkey. After you allow access, quit and reopen the app once.</p></details>
+        <details><summary>Where are my clips saved?</summary>
+          <p>In <strong>Movies › Clipper</strong> by default. You can pick any folder in Settings.</p></details>
+        <details><summary>Which screen does it record?</summary>
+          <p>Your main display (the one with the menu bar).</p></details>
+        <details><summary>What happens when I share a link?</summary>
+          <p>Only when you click <strong>Share Link</strong>, Clipper uploads a smaller copy of that one clip to a free file host (Litterbox, Uguu or Gofile) and copies the link. Anyone with the link can watch it until it expires. Your original file never changes.</p></details>
+        <details><summary>Does Clipper update itself?</summary>
+          <p>Yes. It checks for new versions and shows an Updates tab with a one-click install.</p></details>
+      </div>
+    </section>
+
+    <div class="final">
+      <h2>Catch your next clutch.</h2>
+      <a class="btn js-download" href="https://github.com/Rymack15/clipper/releases/latest/download/Clipper.dmg">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12m0 0l-5-5m5 5l5-5M4 20h16"/></svg>
+        Download for Mac</a>
+    </div>
+  </main>
+
+  <footer>
+    © <span id="year">2026</span> Clipper · <a href="https://github.com/Rymack15/clipper/releases">All versions</a>
+  </footer>
+</div>
+
+<script>
+  document.getElementById('year').textContent = new Date().getFullYear();
+  // Fill in the newest version and keep the button on the freshest .dmg (falls back to the static link above).
+  fetch('https://api.github.com/repos/Rymack15/clipper/releases/latest', { headers: { Accept: 'application/vnd.github+json' } })
+    .then(r => r.ok ? r.json() : Promise.reject())
+    .then(rel => {
+      const dmg = (rel.assets || []).find(a => a.name.endsWith('.dmg'));
+      if (dmg) document.querySelectorAll('.js-download').forEach(a => a.href = dmg.browser_download_url);
+      const mb = dmg ? ' · ' + (dmg.size / 1048576).toFixed(1) + ' MB' : '';
+      document.getElementById('ver').textContent = 'Version ' + rel.tag_name.replace(/^v/i, '') + mb;
+    })
+    .catch(() => {});
+</script>
+</body>
+</html>
