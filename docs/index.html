@@ -163,7 +163,7 @@
   <header class="nav">
     <a class="brand" href="#"><img src="icon.png" alt="">Clipper</a>
     <nav><a class="link" href="#features">Features</a><a class="link" href="#how">How it works</a><a class="link" href="#faq">FAQ</a><a class="link" href="#bug">Report a bug</a>
-      <a class="btn small js-download" href="https://github.com/Rymack15/clipper/releases/latest/download/Clipper.dmg" style="margin-left:22px">Download</a></nav>
+      <a class="btn small js-download" href="/download/" style="margin-left:22px">Download</a></nav>
   </header>
 
   <main>
@@ -172,7 +172,7 @@
       <h1>Never miss <span>the moment.</span></h1>
       <p class="sub">Clipper lives in your menu bar and keeps your screen, game audio and mic in a rolling buffer. Press one hotkey and the last stretch is saved as a video. Share it as a link.</p>
       <div class="cta">
-        <a class="btn js-download" href="https://github.com/Rymack15/clipper/releases/latest/download/Clipper.dmg">
+        <a class="btn js-download" href="/download/">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12m0 0l-5-5m5 5l5-5M4 20h16"/></svg>
           Download for Mac
         </a>
@@ -230,10 +230,12 @@
       <h2>Questions</h2>
       <p class="lead">&nbsp;</p>
       <div class="faq">
-        <details><summary>macOS says Clipper "can't be opened" or "is damaged"</summary>
-          <p>Clipper is a new indie app and isn't notarized by Apple yet, so Gatekeeper warns on the first launch. To open it:</p>
-          <ol><li>Drag Clipper to Applications.</li><li>Right-click it, choose <strong>Open</strong>, then <strong>Open</strong> again.</li></ol>
-          <p>If that doesn't work, run this once in Terminal: <code>xattr -dr com.apple.quarantine /Applications/Clipper.app</code></p></details>
+        <details><summary>macOS says Clipper "can't be opened" or can't verify it</summary>
+          <p>Clipper isn't notarized by Apple yet, so macOS warns about it the first time. That warning appears for every app Apple hasn't checked. To open it:</p>
+          <ol><li>Drag Clipper to Applications and open it. When the warning appears, click <strong>Done</strong>.</li>
+            <li>Open <strong>System Settings → Privacy &amp; Security</strong>, scroll to <strong>Security</strong> and click <strong>Open Anyway</strong> next to Clipper.</li>
+            <li>Open Clipper again and click <strong>Open</strong>.</li></ol>
+          <p>Or run this once in Terminal: <code>xattr -dr com.apple.quarantine /Applications/Clipper.app</code></p></details>
         <details><summary>Why does it need Screen Recording and Microphone?</summary>
           <p>Screen Recording lets macOS give Clipper your display and system audio. Microphone adds your voice. Clipper only holds the most recent clip length in memory and writes a file only when you press the hotkey. After you allow access, quit and reopen the app once.</p></details>
         <details><summary>Where are my clips saved?</summary>
@@ -268,7 +270,7 @@
 
     <div class="final">
       <h2>Catch your next clutch.</h2>
-      <a class="btn js-download" href="https://github.com/Rymack15/clipper/releases/latest/download/Clipper.dmg">
+      <a class="btn js-download" href="/download/">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12m0 0l-5-5m5 5l5-5M4 20h16"/></svg>
         Download for Mac</a>
     </div>
@@ -286,7 +288,6 @@
     .then(r => r.ok ? r.json() : Promise.reject())
     .then(rel => {
       const dmg = (rel.assets || []).find(a => a.name.endsWith('.dmg'));
-      if (dmg) document.querySelectorAll('.js-download').forEach(a => a.href = dmg.browser_download_url);
       const mb = dmg ? ' · ' + (dmg.size / 1048576).toFixed(1) + ' MB' : '';
       const bv = document.getElementById('bugversion'); if (bv && !bv.value) bv.placeholder = 'e.g. ' + rel.tag_name.replace(/^v/i, '');
       document.getElementById('ver').textContent = 'Version ' + rel.tag_name.replace(/^v/i, '') + mb;
