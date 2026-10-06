@@ -127,6 +127,26 @@
   footer { padding: 54px 0 46px; text-align: center; color: var(--muted); font-size: 14px; }
   footer a { color: var(--muted); }
 
+
+  /* bug report */
+  .bug { max-width: 760px; margin: 0 auto; background: var(--card); border: 1px solid var(--line); border-radius: 18px; padding: 26px; display: grid; gap: 16px; grid-template-columns: 1fr 1fr; }
+  .bug .full { grid-column: 1 / -1; }
+  .bug label { display: grid; gap: 6px; font-size: 14px; font-weight: 600; }
+  .bug label small { font-weight: 400; color: var(--muted); }
+  .bug input, .bug textarea {
+    font: inherit; font-weight: 400; color: var(--text); background: rgba(255,255,255,.05); border: 1px solid var(--line);
+    border-radius: 10px; padding: 11px 13px; width: 100%; outline: none; transition: border-color .15s, background .15s;
+  }
+  .bug input:focus, .bug textarea:focus { border-color: var(--accent); background: rgba(139,92,246,.08); }
+  .bug textarea { min-height: 110px; resize: vertical; }
+  .bug .hp { position: absolute; left: -9999px; width: 1px; height: 1px; opacity: 0; }
+  .bug .row { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
+  .bug button { cursor: pointer; border: 0; font: inherit; font-weight: 600; }
+  .bug button[disabled] { opacity: .6; cursor: default; transform: none; }
+  #bugmsg { font-size: 14px; margin: 0; }
+  #bugmsg.ok { color: #34d399; } #bugmsg.err { color: #ff8a98; }
+  @media (max-width: 720px) { .bug { grid-template-columns: 1fr; padding: 18px; } }
+
   @media (max-width: 720px) {
     .body { grid-template-columns: minmax(0, 1fr); } .side { display: none; }
     .banner { right: 8px; top: -30px; width: 250px; }
@@ -142,7 +162,7 @@
 <div class="wrap">
   <header class="nav">
     <a class="brand" href="#"><img src="icon.png" alt="">Clipper</a>
-    <nav><a class="link" href="#features">Features</a><a class="link" href="#how">How it works</a><a class="link" href="#faq">FAQ</a>
+    <nav><a class="link" href="#features">Features</a><a class="link" href="#how">How it works</a><a class="link" href="#faq">FAQ</a><a class="link" href="#bug">Report a bug</a>
       <a class="btn small js-download" href="https://github.com/Rymack15/clipper/releases/latest/download/Clipper.dmg" style="margin-left:22px">Download</a></nav>
   </header>
 
@@ -227,6 +247,25 @@
       </div>
     </section>
 
+    <section id="bug">
+      <h2>Found a bug?</h2>
+      <p class="lead">Tell me what happened and I'll look into it. Reports go straight to my inbox.</p>
+      <form id="bugform" class="bug" novalidate>
+        <label>Your name <small>(optional)</small><input name="name" autocomplete="name" maxlength="80"></label>
+        <label>Your email <small>(optional, so I can reply)</small><input name="email" type="email" autocomplete="email" maxlength="120"></label>
+        <label>macOS version<input name="macos" placeholder="e.g. macOS 15.2" maxlength="60"></label>
+        <label>Clipper version<input name="version" id="bugversion" placeholder="e.g. 2.0" maxlength="30"></label>
+        <label class="full">What went wrong?<textarea name="message" required minlength="10" maxlength="4000" placeholder="Describe the problem. What did you expect, and what happened instead?"></textarea></label>
+        <label class="full">How can I make it happen again? <small>(optional)</small><textarea name="steps" maxlength="4000" placeholder="1. Open Clipper&#10;2. Press the hotkey&#10;3. …"></textarea></label>
+        <input class="hp" type="text" name="_honey" tabindex="-1" autocomplete="off" aria-hidden="true">
+        <div class="full row">
+          <button class="btn" type="submit" id="bugbtn">Send report</button>
+          <p id="bugmsg" role="status" aria-live="polite"></p>
+        </div>
+        <p class="full meta" style="margin:0">Tip: for crashes or recording problems, add the last lines of <code>~/Library/Logs/Clipper.log</code> to your message. Reports are sent through a form service (FormSubmit) to my email.</p>
+      </form>
+    </section>
+
     <div class="final">
       <h2>Catch your next clutch.</h2>
       <a class="btn js-download" href="https://github.com/Rymack15/clipper/releases/latest/download/Clipper.dmg">
@@ -249,9 +288,38 @@
       const dmg = (rel.assets || []).find(a => a.name.endsWith('.dmg'));
       if (dmg) document.querySelectorAll('.js-download').forEach(a => a.href = dmg.browser_download_url);
       const mb = dmg ? ' · ' + (dmg.size / 1048576).toFixed(1) + ' MB' : '';
+      const bv = document.getElementById('bugversion'); if (bv && !bv.value) bv.placeholder = 'e.g. ' + rel.tag_name.replace(/^v/i, '');
       document.getElementById('ver').textContent = 'Version ' + rel.tag_name.replace(/^v/i, '') + mb;
     })
     .catch(() => {});
+
+  // Bug report form -> emailed via FormSubmit (https://formsubmit.co)
+  (function () {
+    const form = document.getElementById('bugform'), btn = document.getElementById('bugbtn'), msg = document.getElementById('bugmsg');
+    const say = (t, cls) => { msg.textContent = t; msg.className = cls || ''; };
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const d = Object.fromEntries(new FormData(form).entries());
+      if (d._honey) return;                                   // spam bots fill the hidden field
+      if (!d.message || d.message.trim().length < 10) { say('Please describe the problem (at least a sentence).', 'err'); return; }
+      btn.disabled = true; say('Sending…');
+      try {
+        const r = await fetch('https://formsubmit.co/ajax/ryanmckenzietable@gmail.com', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+          body: JSON.stringify({
+            _subject: 'Clipper bug report', _template: 'table', _captcha: 'false',
+            name: d.name || '(not given)', email: d.email || undefined, 'macOS version': d.macos || '(not given)',
+            'Clipper version': d.version || '(not given)', message: d.message, 'steps to reproduce': d.steps || '(not given)',
+            'sent from': location.href, browser: navigator.userAgent
+          })
+        });
+        const j = await r.json().catch(() => ({}));
+        if (r.ok && String(j.success) === 'true') { say('Thanks! Your report was sent.', 'ok'); form.reset(); setTimeout(() => { btn.disabled = false; }, 20000); }
+        else throw new Error(j.message || 'failed');
+      } catch (err) { say('Sorry, that did not send. Please try again in a bit.', 'err'); btn.disabled = false; }
+    });
+  })();
 </script>
 </body>
 </html>
