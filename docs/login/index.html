@@ -86,9 +86,14 @@
   }
 
   // Hand the new session to the Mac app, then forget it in this browser so the two never share a refresh token.
+  // Note: sb.auth.signOut() would also revoke the session on the server, which would kill the app's login. Just forget it locally.
+  function forgetHere() {
+    try { sb.auth.stopAutoRefresh(); } catch (e) {}
+    try { Object.keys(localStorage).filter(function (k) { return k.indexOf('sb-') === 0; }).forEach(function (k) { localStorage.removeItem(k); }); } catch (e) {}
+  }
   async function finishForApp(session, email) {
     var url = 'clipper://auth?refresh_token=' + encodeURIComponent(session.refresh_token) + '&state=' + encodeURIComponent(appState);
-    await sb.auth.signOut({ scope: 'local' });
+    forgetHere();
     $('formCard').classList.add('hidden'); $('doneCard').classList.remove('hidden');
     $('doneSub').textContent = 'Signed in as ' + email + '. Opening Clipper…';
     $('openApp').href = url;
@@ -151,7 +156,7 @@
   if (q.get('error_description') || (h.get('error_description'))) say((q.get('error_description') || h.get('error_description')).replace(/\+/g, ' '), 'err');
 
   // In app mode always start from a clean browser session.
-  if (appMode) sb.auth.signOut({ scope: 'local' }); else sb.auth.getSession().then(function (r) { if (r.data.session) location.replace('/account/'); });
+  if (appMode) forgetHere(); else sb.auth.getSession().then(function (r) { if (r.data.session) location.replace('/account/'); });
 })();
 </script>
 </body>
