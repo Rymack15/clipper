@@ -1,0 +1,169 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>My account — Clipper</title>
+<meta name="robots" content="noindex">
+<link rel="icon" type="image/png" href="../favicon.png">
+<link rel="stylesheet" href="../auth.css">
+<meta name="theme-color" content="#0d0a1c">
+</head>
+<body>
+<div class="glow"></div>
+<div class="wrap">
+  <header class="top">
+    <a class="brand" href="/"><img src="../icon.png" alt="">Clipper</a>
+    <div><span id="who" style="color:var(--muted);margin-right:12px;font-size:14px"></span><button class="btn small" id="signout" type="button">Sign out</button></div>
+  </header>
+
+  <main id="main" class="hidden">
+    <!-- password reset (arrived from the email link) -->
+    <section class="card auth hidden" id="resetCard">
+      <h1>Choose a new password</h1>
+      <form id="resetForm"><label>New password<input type="password" id="newpw" autocomplete="new-password" minlength="8"></label>
+        <button class="btn primary" type="submit">Save password</button><p class="msg" id="resetMsg"></p></form>
+    </section>
+
+    <h1 style="font-size:32px;letter-spacing:-.02em;margin:10px 0 0">My clips</h1>
+    <div class="card" style="margin-top:16px">
+      <div class="row"><b>Storage</b><span id="usageText" style="color:var(--muted);font-size:14px"></span></div>
+      <div class="usage"><i id="usageBar"></i></div>
+      <small style="color:var(--muted)">Clips are private. Only you can see them while signed in. Upload them from the Clipper app (cloud button on a clip, or turn on auto-upload in Settings).</small>
+    </div>
+    <p class="msg" id="clipsMsg"></p>
+    <div class="clips" id="clips"></div>
+    <div class="empty hidden" id="empty">No clips here yet.<br>Open Clipper, go to the Clips tab and click the cloud button on a clip.</div>
+
+    <h2 class="sec">Account</h2>
+    <div class="card">
+      <form id="pwForm" class="row" style="align-items:flex-end">
+        <label style="margin:0;flex:1;min-width:220px">Change password<input type="password" id="pw" autocomplete="new-password" minlength="8" placeholder="New password (8+ characters)"></label>
+        <button class="btn" type="submit">Update</button>
+      </form>
+      <p class="msg" id="pwMsg"></p>
+      <hr style="border:0;border-top:1px solid var(--line);margin:18px 0">
+      <div class="row"><div><b>Delete my account</b><br><small style="color:var(--muted)">Permanently deletes your account and every clip you uploaded. This can't be undone.</small></div>
+        <button class="btn danger" id="delOpen" type="button">Delete account…</button></div>
+      <form id="delForm" class="hidden" style="margin-top:14px">
+        <label>Type DELETE to confirm<input type="text" id="delConfirm" autocomplete="off"></label>
+        <button class="btn danger" type="submit">Permanently delete everything</button>
+        <p class="msg" id="delMsg"></p>
+      </form>
+    </div>
+  </main>
+
+  <p id="loading" style="text-align:center;color:var(--muted);margin-top:60px">Loading…</p>
+  <footer class="foot"><a href="/">macclipping.com</a> · <a href="/privacy/">Privacy</a></footer>
+</div>
+
+<script src="../config.js"></script>
+<script src="../vendor/supabase.min.js"></script>
+<script>
+(function () {
+  var cfg = window.CLIPPER || {};
+  var $ = function (id) { return document.getElementById(id); };
+  if (!cfg.SUPABASE_URL || !cfg.SUPABASE_ANON_KEY) { $('loading').textContent = 'Accounts aren\'t ready yet. Please check back soon.'; return; }
+  var CAP = 500 * 1024 * 1024;
+  var sb = supabase.createClient(cfg.SUPABASE_URL, cfg.SUPABASE_ANON_KEY, { auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true } });
+  var userId = null;
+
+  function say(el, t, cls) { el.textContent = t || ''; el.className = 'msg ' + (cls || ''); }
+  function bytes(n) { if (n < 1048576) return Math.max(1, Math.round(n / 1024)) + ' KB'; return (n / 1048576).toFixed(1) + ' MB'; }
+  function mins(s) { s = Math.round(s || 0); return Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0'); }
+  function el(tag, cls, text) { var e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; }
+
+  sb.auth.onAuthStateChange(function (event) { if (event === 'PASSWORD_RECOVERY') { $('resetCard').classList.remove('hidden'); } if (event === 'SIGNED_OUT' && !userId) location.replace('/login/'); });
+
+  async function init() {
+    var r = await sb.auth.getSession();
+    var session = r.data.session;
+    if (!session) { location.replace('/login/'); return; }
+    userId = session.user.id;
+    $('who').textContent = session.user.email;
+    $('loading').classList.add('hidden'); $('main').classList.remove('hidden');
+    if (new URLSearchParams(location.search).get('reset') === '1') $('resetCard').classList.remove('hidden');
+    loadClips();
+  }
+
+  async function loadClips() {
+    var r = await sb.from('clips').select('*').order('created_at', { ascending: false });
+    var box = $('clips'); box.textContent = '';
+    if (r.error) { say($('clipsMsg'), 'Couldn\'t load your clips: ' + r.error.message, 'err'); return; }
+    var used = 0;
+    r.data.forEach(function (c) { used += Number(c.size_bytes) || 0; box.appendChild(card(c)); });
+    $('empty').classList.toggle('hidden', r.data.length > 0);
+    $('usageText').textContent = bytes(used) + ' of ' + bytes(CAP) + ' used';
+    $('usageBar').style.width = Math.min(100, used / CAP * 100) + '%';
+  }
+
+  function card(c) {
+    var d = el('div', 'clip');
+    var ph = el('div', 'ph', '▶'); ph.title = 'Play'; d.appendChild(ph);
+    var meta = el('div', 'meta'); meta.appendChild(el('b', '', c.title));
+    meta.appendChild(el('small', '', new Date(c.created_at).toLocaleString() + ' · ' + mins(c.duration_s) + ' · ' + bytes(Number(c.size_bytes) || 0)));
+    d.appendChild(meta);
+    var acts = el('div', 'acts');
+    var play = el('button', 'btn small primary', 'Watch'); play.type = 'button';
+    var dl = el('button', 'btn small', 'Download'); dl.type = 'button';
+    var del = el('button', 'btn small danger', 'Delete'); del.type = 'button';
+    acts.appendChild(play); acts.appendChild(dl); acts.appendChild(del); d.appendChild(acts);
+
+    async function watch() {
+      var s = await sb.storage.from('clips').createSignedUrl(c.path, 3600);
+      if (s.error) { say($('clipsMsg'), 'Couldn\'t open that clip: ' + s.error.message, 'err'); return; }
+      var v = document.createElement('video'); v.controls = true; v.autoplay = true; v.playsInline = true; v.src = s.data.signedUrl;
+      d.replaceChild(v, d.firstChild);
+    }
+    ph.onclick = watch; play.onclick = watch;
+    dl.onclick = async function () {
+      var s = await sb.storage.from('clips').createSignedUrl(c.path, 300, { download: c.title + '.mp4' });
+      if (s.error) { say($('clipsMsg'), 'Couldn\'t prepare the download: ' + s.error.message, 'err'); return; }
+      location.href = s.data.signedUrl;
+    };
+    del.onclick = async function () {
+      if (!confirm('Delete "' + c.title + '" from your account? This can\'t be undone.')) return;
+      var rm = await sb.storage.from('clips').remove([c.path]);
+      if (rm.error) { say($('clipsMsg'), 'Couldn\'t delete the file: ' + rm.error.message, 'err'); return; }
+      var rr = await sb.from('clips').delete().eq('id', c.id);
+      if (rr.error) { say($('clipsMsg'), 'Couldn\'t delete the clip: ' + rr.error.message, 'err'); return; }
+      loadClips();
+    };
+    return d;
+  }
+
+  $('signout').onclick = async function () { await sb.auth.signOut(); location.href = '/'; };
+
+  $('pwForm').onsubmit = async function (e) {
+    e.preventDefault(); var pw = $('pw').value;
+    if (pw.length < 8) { say($('pwMsg'), 'Use at least 8 characters.', 'err'); return; }
+    var r = await sb.auth.updateUser({ password: pw });
+    say($('pwMsg'), r.error ? r.error.message : 'Password updated.', r.error ? 'err' : 'ok'); if (!r.error) $('pw').value = '';
+  };
+  $('resetForm').onsubmit = async function (e) {
+    e.preventDefault(); var pw = $('newpw').value;
+    if (pw.length < 8) { say($('resetMsg'), 'Use at least 8 characters.', 'err'); return; }
+    var r = await sb.auth.updateUser({ password: pw });
+    say($('resetMsg'), r.error ? r.error.message : 'Password saved. You\'re all set.', r.error ? 'err' : 'ok');
+    if (!r.error) setTimeout(function () { $('resetCard').classList.add('hidden'); history.replaceState(null, '', '/account/'); }, 1500);
+  };
+
+  $('delOpen').onclick = function () { $('delForm').classList.toggle('hidden'); };
+  $('delForm').onsubmit = async function (e) {
+    e.preventDefault();
+    if ($('delConfirm').value.trim() !== 'DELETE') { say($('delMsg'), 'Type DELETE (in capitals) to confirm.', 'err'); return; }
+    say($('delMsg'), 'Deleting…');
+    var list = await sb.from('clips').select('path');
+    if (list.error) { say($('delMsg'), list.error.message, 'err'); return; }
+    var paths = list.data.map(function (r) { return r.path; });
+    if (paths.length) { var rm = await sb.storage.from('clips').remove(paths); if (rm.error) { say($('delMsg'), 'Couldn\'t remove your clips: ' + rm.error.message, 'err'); return; } }
+    var r = await sb.rpc('delete_my_account');
+    if (r.error) { say($('delMsg'), 'Couldn\'t delete the account: ' + r.error.message, 'err'); return; }
+    userId = null; await sb.auth.signOut({ scope: 'local' }); location.href = '/?deleted=1';
+  };
+
+  init();
+})();
+</script>
+</body>
+</html>

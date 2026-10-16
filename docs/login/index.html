@@ -1,0 +1,136 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Sign in — Clipper</title>
+<meta name="robots" content="noindex">
+<link rel="icon" type="image/png" href="../favicon.png">
+<link rel="stylesheet" href="../auth.css">
+<meta name="theme-color" content="#0d0a1c">
+</head>
+<body>
+<div class="glow"></div>
+<div class="wrap">
+  <header class="top"><a class="brand" href="/"><img src="../icon.png" alt="">Clipper</a></header>
+
+  <main class="auth">
+    <!-- sign in / create account -->
+    <section class="card" id="formCard">
+      <h1 id="title">Welcome to Clipper</h1>
+      <p class="sub" id="sub">Sign in to use the app and see your clips online.</p>
+      <div class="tabs" id="tabs"><button type="button" id="tabIn" class="on">Sign in</button><button type="button" id="tabUp">Create account</button></div>
+      <form id="form" novalidate>
+        <label>Email<input type="email" id="email" autocomplete="email" required></label>
+        <label id="pwLabel">Password<input type="password" id="password" autocomplete="current-password" required minlength="8"></label>
+        <label id="pw2Label" class="hidden">Confirm password<input type="password" id="password2" autocomplete="new-password" minlength="8"></label>
+        <label class="check hidden" id="agreeRow"><input type="checkbox" id="agree"><span>I agree to the <a href="/privacy/" target="_blank" rel="noopener">Privacy Policy</a>.</span></label>
+        <button class="btn primary" style="width:100%" id="submit" type="submit">Sign in</button>
+        <p class="msg" id="msg" role="status" aria-live="polite"></p>
+        <p style="margin:6px 0 0;text-align:center" id="forgotRow"><button class="link-btn" type="button" id="forgot">Forgot your password?</button></p>
+      </form>
+    </section>
+
+    <!-- handing the sign-in back to the Mac app -->
+    <section class="card hidden" id="doneCard" style="text-align:center">
+      <h1>You're signed in</h1>
+      <p class="sub" id="doneSub">Opening Clipper…</p>
+      <a class="btn primary" id="openApp" href="#">Open Clipper</a>
+      <p class="msg" style="margin-top:14px">If nothing happens, make sure Clipper is installed, then click the button.</p>
+    </section>
+
+    <section class="card hidden" id="offCard"><h1>Sign-in isn't ready yet</h1><p class="sub">This page isn't connected to the account service yet. Please check back soon.</p></section>
+  </main>
+
+  <footer class="foot"><a href="/">macclipping.com</a> · <a href="/privacy/">Privacy</a></footer>
+</div>
+
+<script src="../config.js"></script>
+<script src="../vendor/supabase.min.js"></script>
+<script>
+(function () {
+  var cfg = window.CLIPPER || {};
+  var $ = function (id) { return document.getElementById(id); };
+  var q = new URLSearchParams(location.search);
+  var appMode = q.get('app') === '1';
+  var appState = (q.get('state') || '').replace(/[^0-9a-f]/gi, '').slice(0, 64);
+  var mode = 'in';
+
+  if (!cfg.SUPABASE_URL || !cfg.SUPABASE_ANON_KEY) { $('formCard').classList.add('hidden'); $('offCard').classList.remove('hidden'); return; }
+  var sb = supabase.createClient(cfg.SUPABASE_URL, cfg.SUPABASE_ANON_KEY, { auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: false } });
+
+  function say(t, cls) { var m = $('msg'); m.textContent = t || ''; m.className = 'msg ' + (cls || ''); }
+  function setMode(m) {
+    mode = m;
+    var up = m === 'up';
+    $('tabIn').classList.toggle('on', !up); $('tabUp').classList.toggle('on', up);
+    $('pw2Label').classList.toggle('hidden', !up); $('agreeRow').classList.toggle('hidden', !up);
+    $('forgotRow').classList.toggle('hidden', up);
+    $('submit').textContent = up ? 'Create account' : 'Sign in';
+    $('password').autocomplete = up ? 'new-password' : 'current-password';
+    say('');
+  }
+  $('tabIn').onclick = function () { setMode('in'); };
+  $('tabUp').onclick = function () { setMode('up'); };
+  if (q.get('mode') === 'signup') setMode('up');
+
+  function niceError(e) {
+    var m = (e && e.message) || 'Something went wrong. Please try again.';
+    if (/invalid login/i.test(m)) return 'That email and password don\'t match.';
+    if (/already registered|already been registered/i.test(m)) return 'There\'s already an account with that email. Try signing in instead.';
+    if (/rate limit|too many/i.test(m)) return 'Too many tries. Please wait a few minutes and try again.';
+    if (/password/i.test(m) && /characters|weak|short/i.test(m)) return 'Please choose a longer password (at least 8 characters).';
+    return m;
+  }
+
+  // Hand the new session to the Mac app, then forget it in this browser so the two never share a refresh token.
+  async function finishForApp(session, email) {
+    var url = 'clipper://auth?refresh_token=' + encodeURIComponent(session.refresh_token) + '&state=' + encodeURIComponent(appState);
+    await sb.auth.signOut({ scope: 'local' });
+    $('formCard').classList.add('hidden'); $('doneCard').classList.remove('hidden');
+    $('doneSub').textContent = 'Signed in as ' + email + '. Opening Clipper…';
+    $('openApp').href = url;
+    location.href = url;
+  }
+
+  async function onSuccess(session, email) {
+    if (appMode && appState) { await finishForApp(session, email); }
+    else { location.href = '/account/'; }
+  }
+
+  $('form').addEventListener('submit', async function (e) {
+    e.preventDefault();
+    var email = $('email').value.trim(), pw = $('password').value;
+    if (!email || !/.+@.+\..+/.test(email)) { say('Please enter a valid email address.', 'err'); return; }
+    if (pw.length < 8) { say('Your password needs at least 8 characters.', 'err'); return; }
+    $('submit').disabled = true; say(mode === 'up' ? 'Creating your account…' : 'Signing in…');
+    try {
+      if (mode === 'up') {
+        if (pw !== $('password2').value) throw new Error('Passwords don\'t match.');
+        if (!$('agree').checked) throw new Error('Please agree to the Privacy Policy to continue.');
+        var r = await sb.auth.signUp({ email: email, password: pw, options: { emailRedirectTo: location.origin + '/account/' } });
+        if (r.error) throw r.error;
+        if (!r.data.session) { say('Account created. Check your email for a confirmation link, then sign in.', 'ok'); setMode('in'); $('submit').disabled = false; return; }
+        await onSuccess(r.data.session, email);
+      } else {
+        var s = await sb.auth.signInWithPassword({ email: email, password: pw });
+        if (s.error) throw s.error;
+        await onSuccess(s.data.session, email);
+      }
+    } catch (err) { say(niceError(err), 'err'); $('submit').disabled = false; }
+  });
+
+  $('forgot').onclick = async function () {
+    var email = $('email').value.trim();
+    if (!email) { say('Enter your email above first, then click "Forgot your password?".', 'err'); return; }
+    say('Sending…');
+    var r = await sb.auth.resetPasswordForEmail(email, { redirectTo: location.origin + '/account/?reset=1' });
+    say(r.error ? niceError(r.error) : 'If that email has an account, a reset link is on its way.', r.error ? 'err' : 'ok');
+  };
+
+  // In app mode always start from a clean browser session.
+  if (appMode) sb.auth.signOut({ scope: 'local' }); else sb.auth.getSession().then(function (r) { if (r.data.session) location.replace('/account/'); });
+})();
+</script>
+</body>
+</html>
