@@ -1,0 +1,86 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Verify — Clipper</title>
+<meta name="robots" content="noindex">
+<link rel="icon" type="image/png" href="../favicon.png">
+<link rel="stylesheet" href="../auth.css">
+<meta name="theme-color" content="#0d0a1c">
+</head>
+<body>
+<div class="glow"></div>
+<div class="wrap">
+  <header class="top"><a class="brand" href="/"><img src="../icon.png" alt="">Clipper</a></header>
+  <main class="auth">
+    <section class="card" id="startCard">
+      <h1>Verify your Discord account</h1>
+      <p class="sub">Sign in with Google to get access to the Clipper Discord server. We only use your Google account to confirm you're a real person; it isn't shown to anyone on Discord.</p>
+      <button type="button" class="btn primary" id="google" style="width:100%;display:flex;align-items:center;justify-content:center;gap:10px">Continue with Google</button>
+      <p class="msg" id="msg" role="status" aria-live="polite" style="text-align:center"></p>
+      <p class="msg" style="text-align:center">By continuing you agree to the <a href="/privacy/">Privacy Policy</a> and <a href="/terms/">Terms</a>.</p>
+    </section>
+    <section class="card hidden" id="doneCard" style="text-align:center">
+      <h1 id="doneTitle">You're verified ✅</h1>
+      <p class="sub" id="doneSub">Head back to Discord. Your roles update within a few seconds.</p>
+    </section>
+    <section class="card hidden" id="offCard"><h1>Verification isn't available</h1><p class="sub" id="offSub">This link is missing its code. Go back to the Verify channel in Discord and click the button again.</p></section>
+  </main>
+  <footer class="foot"><a href="/">macclipping.com</a> · <a href="/privacy/">Privacy</a> · <a href="/terms/">Terms</a></footer>
+</div>
+<script src="../config.js"></script>
+<script src="../vendor/supabase.min.js"></script>
+<script>
+(function () {
+  var cfg = window.CLIPPER || {};
+  var $ = function (id) { return document.getElementById(id); };
+  var q = new URLSearchParams(location.search);
+  var code = (q.get('c') || '').replace(/[^0-9a-f]/gi, '').slice(0, 64);
+  function show(id) { ['startCard', 'doneCard', 'offCard'].forEach(function (x) { $(x).classList.toggle('hidden', x !== id); }); }
+  function say(t, cls) { var m = $('msg'); m.textContent = t || ''; m.className = 'msg ' + (cls || ''); }
+  if (!cfg.SUPABASE_URL || !cfg.SUPABASE_ANON_KEY || !code) { show('offCard'); return; }
+  var sb = supabase.createClient(cfg.SUPABASE_URL, cfg.SUPABASE_ANON_KEY, { auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: false } });
+  var MSG = {
+    need_google: 'Please sign in with Google to verify.',
+    invalid: 'That verification link isn\'t valid. Go back to Discord and click Verify again.',
+    expired: 'That link expired. Go back to Discord and click Verify again.',
+    used: 'That link was already used by another account.',
+    already_linked: 'This Google account is already linked to a different Discord account.',
+    not_signed_in: 'Please sign in with Google to verify.'
+  };
+
+  async function finish(session) {
+    show('doneCard'); $('doneTitle').textContent = 'Verifying…'; $('doneSub').textContent = '';
+    var r = await sb.rpc('discord_complete_verification', { p_code: code });
+    if (r.error || r.data !== 'ok') {
+      show('startCard'); say(MSG[r.data] || (r.error && r.error.message) || 'Something went wrong. Please try again.', 'err');
+      if (r.data === 'need_google' || r.data === 'not_signed_in') { try { await sb.auth.signOut({ scope: 'local' }); } catch (e) {} }
+      return;
+    }
+    $('doneTitle').textContent = 'You\'re verified ✅';
+    $('doneSub').textContent = 'Head back to Discord. Your roles update within a few seconds.';
+    try { await sb.auth.signOut({ scope: 'local' }); } catch (e) {}
+  }
+
+  $('google').onclick = async function () {
+    say('Opening Google…');
+    var r = await sb.auth.signInWithOAuth({ provider: 'google', options: { redirectTo: location.origin + '/verify/?c=' + code } });
+    if (r.error) say('Google sign-in isn\'t available right now.', 'err');
+  };
+
+  var h = new URLSearchParams(location.hash.replace(/^#/, ''));
+  if (h.get('access_token') && h.get('refresh_token')) {
+    history.replaceState(null, '', location.pathname + location.search);
+    show('doneCard'); $('doneTitle').textContent = 'Verifying…'; $('doneSub').textContent = '';
+    sb.auth.setSession({ access_token: h.get('access_token'), refresh_token: h.get('refresh_token') }).then(function (r) {
+      if (r.error || !r.data.session) { show('startCard'); say('Google sign-in didn\'t finish. Please try again.', 'err'); return; }
+      finish(r.data.session);
+    });
+  } else if (h.get('error_description') || q.get('error_description')) {
+    say((h.get('error_description') || q.get('error_description')).replace(/\+/g, ' '), 'err');
+  }
+})();
+</script>
+</body>
+</html>
